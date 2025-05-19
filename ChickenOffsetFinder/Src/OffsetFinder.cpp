@@ -162,6 +162,7 @@ namespace COF
         }
         else if (Anchor.Type == SearchCriteria::AnchorType::Pattern)
         {
+
           auto Found =
             this->Analyzer.FindPattern(FunctionBase, FunctionSize, Anchor.Pattern);
 
@@ -172,10 +173,11 @@ namespace COF
 
           std::uint64_t AnchorOffset = Found->Range.Offset;
           AnchorFound(FunctionBase, AnchorOffset);
+          COF_LOG("[+] Found function (0x%X) with anchor (0x%X) (Type: Pattern)", FunctionBase, AnchorOffset);
         }
         else if (Anchor.Type == SearchCriteria::AnchorType::PatternSubsequence)
         {
-          auto Found = this->Analyzer.FindIdaPatternSubsequence(FunctionBase, FunctionSize, Anchor.PatternSubsequence);
+          auto Found = this->Analyzer.FindPatternSubsequence(FunctionBase, FunctionSize, Anchor.PatternSubsequence);
 
           if (!Found)
           {
@@ -184,6 +186,38 @@ namespace COF
 
           std::uint64_t AnchorOffset = Found->Range.Offset;
           AnchorFound(FunctionBase, AnchorOffset);
+          COF_LOG("[+] Found function (0x%X) with anchor (0x%X) (Type: PatternSubsequence)", FunctionBase, AnchorOffset);
+        }
+        else if (Anchor.Type == SearchCriteria::AnchorType::InstructionSequence)
+        {
+          std::vector<AssemblyParser::ParsedInstruction> ParsedInstructions;
+
+          for (const auto& AsmText : Anchor.InstructionSequence)
+          {
+            auto Instruction = COF::AssemblyParser::ParseInstruction(AsmText);
+
+            if (!Instruction)
+            {
+              COF_LOG("[!] Parsing instruction (%s) in sequence failed!", AsmText.c_str());
+
+              // Return instead of break here because
+              // we have a malformed instruction that should be fixed.
+              return std::nullopt;
+            }
+
+            ParsedInstructions.push_back(*Instruction);
+          }
+
+          auto Found = this->Analyzer.FindInstructionSequence(FunctionBase, FunctionSize, ParsedInstructions);
+
+          if (!Found)
+          {
+            break;
+          }
+
+          std::uint64_t AnchorOffset = Found->Range.Offset;
+          AnchorFound(FunctionBase, AnchorOffset);
+          COF_LOG("[+] Found function (0x%X) with anchor (0x%X) (Type: InstructionSequence)", FunctionBase, AnchorOffset);
         }
         else if (Anchor.Type == SearchCriteria::AnchorType::InstructionSubsequence)
         {
@@ -214,6 +248,7 @@ namespace COF
 
           std::uint64_t AnchorOffset = Found->Range.Offset;
           AnchorFound(FunctionBase, AnchorOffset);
+          COF_LOG("[+] Found function (0x%X) with anchor (0x%X) (Type: InstructionSubsequence)", FunctionBase, AnchorOffset);
         }
       }
 
@@ -313,7 +348,9 @@ namespace COF
     return this->JSON_SearchRegions;
   }
 
-  void OffsetFinder::JSON_UpdateSearchRange(const TRange& Range, TSearchRegion& Region, TSearchFor& ToFind)
+  // Currently only synchronizes 'Offset'.
+  // Synchronizing 'Size' causes complications with some MatcherTypes so fo rnow its ignored.
+  void OffsetFinder::JSON_SyncSearchRange(const TRange& Range, TSearchRegion& Region, TSearchFor& ToFind)
   {
     // Option isnt enabled, we dont wanna update
     if (!this->ShouldSyncSearchConfig)
@@ -340,7 +377,7 @@ namespace COF
         }
 
         Find["SearchRange"]["Offset"] = Range.Offset;
-        Find["SearchRange"]["Size"] = Range.Size;
+        //Find["SearchRange"]["Size"] = Range.Size;
 
         break; // Already found
       }
@@ -521,6 +558,11 @@ namespace COF
               CppAnchor.PatternSubsequence =
                 Anchor.at("Value").get<std::vector<std::string>>();
             }
+            else if (CppType == SearchCriteria::AnchorType::InstructionSequence)
+            {
+              CppAnchor.InstructionSequence =
+                Anchor.at("Value").get<std::vector<std::string>>();
+            }
             else if (CppType == SearchCriteria::AnchorType::InstructionSubsequence)
             {
               CppAnchor.InstructionSubsequence =
@@ -607,6 +649,10 @@ namespace COF
               else if (CppMatcher.Type == SearchCriteria::MatcherType::PatternSubsequence)
               {
                 CppMatcher.PatternSubsequence = Matcher.at("Value").get<std::vector<std::string>>();
+              }
+              else if (CppMatcher.Type == SearchCriteria::MatcherType::InstructionSequence)
+              {
+                CppMatcher.InstructionSequence = Matcher.at("Value").get<std::vector<std::string>>();
               }
               else if (CppMatcher.Type == SearchCriteria::MatcherType::InstructionSubsequence)
               {
@@ -703,7 +749,7 @@ namespace COF
 
     if (!SearchConfigFile.is_open())
     {
-      COF_LOG("[!] Failed to open search configuration (%s) for updating!", this->SearchConfigPath.c_str());
+      COF_LOG("[!] Failed to open search configuration (%s) for synchronization!", this->SearchConfigPath.c_str());
       return false;
     }
 
@@ -711,7 +757,7 @@ namespace COF
     // std::setw(2) makes it pretty-printed with 2-space indentation
     SearchConfigFile << std::setw(2) << this->JSON_SearchRegions;
 
-    COF_LOG("[+] Updated search configuration (%s) successfully!", this->SearchConfigPath.c_str());
+    COF_LOG("[+] Synchronized search configuration (%s) successfully!", this->SearchConfigPath.c_str());
     return true;
   }
 
@@ -731,7 +777,7 @@ namespace COF
 
   bool OffsetFinder::Init(const std::string& FilePath)
   {
-    COF_LOG("[>] Opening memory dump (file): %s", FilePath.c_str());
+    COF_LOG("[>] Opening memory dump (File): %s", FilePath.c_str());
 
     if (!this->Analyzer.Open(FilePath))
     {

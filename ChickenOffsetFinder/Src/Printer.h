@@ -800,7 +800,7 @@ namespace COF
                       }
 
                       std::string IndentedValue = Util::String::Join(Tokens, '\n');
-                      OutOffsets += Util::String::Format(PreFormat.c_str(), IndentedValue) + '\n';
+                      OutOffsets += Util::String::Format(PreFormat.c_str(), IndentedValue.c_str()) + '\n';
                     }
                     else if (Match.SearchType == SearchType::TslDecryptor64)
                     {
@@ -815,7 +815,7 @@ namespace COF
                       }
 
                       std::string IndentedValue = Util::String::Join(Tokens, '\n');
-                      OutOffsets += Util::String::Format(PreFormat.c_str(), IndentedValue) + '\n';
+                      OutOffsets += Util::String::Format(PreFormat.c_str(), IndentedValue.c_str()) + '\n';
                     }
                   }
                 }

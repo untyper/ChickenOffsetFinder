@@ -72,11 +72,12 @@ namespace COF
         std::size_t FunctionSize = Region.RegionRange.Size;
         std::size_t FunctionSizeVariation = Region.RegionRange.SizeVariation;
 
+        std::size_t ToFindSize = ToFind.SearchRange.Size;
         std::size_t ToFindSizeVariation = ToFind.SearchRange.SizeVariation;
         std::uint64_t ToFindOffsetVariation = ToFind.SearchRange.OffsetVariation;
 
-        std::size_t SizeHigh = ToFindOffsetVariation + ToFind.SearchRange.Size + ToFindSizeVariation;
         std::uint64_t OffsetLow = ToFind.SearchRange.Offset;
+        std::size_t SizeHigh = ToFindOffsetVariation + ToFindSize + ToFindSizeVariation;
 
         // Only substract variation if variation is smaller than the actual offset,
         // unless you want to deal with unsigned integer wraparound issues.
@@ -85,9 +86,8 @@ namespace COF
           OffsetLow -= ToFindOffsetVariation;
         }
 
-        // Set scan range to Range approx size if
-        // scan range not explictly set.
-        if (SizeHigh <= ToFindSizeVariation)
+        // Set search range to size of region if not explicitly set
+        if (ToFindSize <= ToFindSizeVariation)
         {
           std::size_t Variation = 0;
 
@@ -96,18 +96,16 @@ namespace COF
             Variation = FunctionSizeVariation;
           }
 
-          // Range size should always be set (explicitly or in RegionHandler),
-          // so that this can work as a fallback.
           SizeHigh = FunctionSize + Variation;
-          //COF_LOG("[?] Scan range was too small, readjusted to region size instead.");
+          //COF_LOG("[?] Search range was too small, readjusted to region size instead.");
         }
 
-        // Truncate scan range to (max) region end.
+        // Truncate search range to (max) region end.
         // Maybe better to log error when the size is out of bounds?
         if (OffsetLow + SizeHigh > FunctionSize + FunctionSizeVariation)
         {
           SizeHigh = (FunctionSize + FunctionSizeVariation) - OffsetLow;
-          COF_LOG("[?] Scan range was out of region bounds, truncated.");
+          //COF_LOG("[?] Search range was out of region bounds, truncated.");
         }
 
         return { OffsetLow, SizeHigh, 0, 0 };
@@ -147,7 +145,7 @@ namespace COF
       COF_LOG("[+] Found immediate value (ID: %s): %d", ToFind.SearchID.c_str(), *Extracted->Value);
 
       std::uint64_t OffsetFromFunctionBase = MatcherCoverage.Offset - Region.RegionRange.Offset;
-      Finder->JSON_UpdateSearchRange({ OffsetFromFunctionBase, MatcherCoverage.Size }, Region, ToFind);
+      Finder->JSON_SyncSearchRange({ OffsetFromFunctionBase, MatcherCoverage.Size }, Region, ToFind);
 
       // Handlers should add the extracted value(s) to the FoundList for later printing/logging.
       Finder->AddFind({ ToFind, *Extracted->Value });
@@ -174,7 +172,7 @@ namespace COF
       COF_LOG("[+] Found displacement value (ID: %s): %d", ToFind.SearchID.c_str(), *Extracted->Value);
 
       std::uint64_t OffsetFromFunctionBase = MatcherCoverage.Offset - Region.RegionRange.Offset;
-      Finder->JSON_UpdateSearchRange({ OffsetFromFunctionBase, MatcherCoverage.Size }, Region, ToFind);
+      Finder->JSON_SyncSearchRange({ OffsetFromFunctionBase, MatcherCoverage.Size }, Region, ToFind);
 
       // Handlers should add the extracted value(s) to the FoundList for later printing/logging.
       Finder->AddFind({ ToFind, *Extracted->Value });
@@ -201,7 +199,7 @@ namespace COF
       COF_LOG("[+] Resolved RIP-relative value (ID: %s): 0x%X", ToFind.SearchID.c_str(), *Extracted->Value);
 
       std::uint64_t OffsetFromFunctionBase = MatcherCoverage.Offset - Region.RegionRange.Offset;
-      Finder->JSON_UpdateSearchRange({ OffsetFromFunctionBase, MatcherCoverage.Size }, Region, ToFind);
+      Finder->JSON_SyncSearchRange({ OffsetFromFunctionBase, MatcherCoverage.Size }, Region, ToFind);
 
       // Handlers should add the extracted value(s) to the FoundList for later printing/logging.
       Finder->AddFind({ ToFind, *Extracted->Value });
@@ -255,7 +253,7 @@ namespace COF
 
       //Finder->AddFind({ ToFind, *Extracted->Value });
       std::uint64_t OffsetFromFunctionBase = MatcherCoverage.Offset - Region.RegionRange.Offset;
-      Finder->JSON_UpdateSearchRange({ OffsetFromFunctionBase, MatcherCoverage.Size }, Region, ToFind);
+      Finder->JSON_SyncSearchRange({ OffsetFromFunctionBase, MatcherCoverage.Size }, Region, ToFind);
 
       if (!XReferenceHandled)
       {
@@ -362,7 +360,7 @@ namespace COF
       COF_LOG("  [?] %s: %s", ToFind.SearchID.c_str(), Decryptors[0].ToString().c_str());
 
       std::uint64_t OffsetFromFunctionBase = DecryptorsOpt->Range.Offset - RegionRange.Offset;
-      Finder->JSON_UpdateSearchRange({ OffsetFromFunctionBase, DecryptorsOpt->Range.Size }, Region, ToFind);
+      Finder->JSON_SyncSearchRange({ OffsetFromFunctionBase, DecryptorsOpt->Range.Size }, Region, ToFind);
 
       // Handlers should add the extracted value(s) to the FoundList for later printing/logging.
       Finder->AddFind({ ToFind, Decryptors[0] });
@@ -395,7 +393,7 @@ namespace COF
       COF_LOG("  [?] %s: %s", ToFind.SearchID.c_str(), Decryptors[0].ToString().c_str());
 
       std::uint64_t OffsetFromFunctionBase = DecryptorsOpt->Range.Offset - RegionRange.Offset;
-      Finder->JSON_UpdateSearchRange({ OffsetFromFunctionBase, DecryptorsOpt->Range.Size }, Region, ToFind);
+      Finder->JSON_SyncSearchRange({ OffsetFromFunctionBase, DecryptorsOpt->Range.Size }, Region, ToFind);
 
       // Handlers should add the extracted value(s) to the FoundList for later printing/logging.
       Finder->AddFind({ ToFind, Decryptors[0] });

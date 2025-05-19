@@ -19,6 +19,12 @@
 
 // TODO: Get version details from dump (from PE header maybe?)
 // TODO: Alias function return types for pretty reasons
+// 
+// TODO:
+//  Make FindInstructionSequence and FindInstructionSubsequence
+//  accept a list of instruction strings and parse the strings
+//  directly in the function(s) instead of separately parsing
+//  them with COF::AssemblyParser prior to use.
 
 namespace COF
 {
@@ -732,6 +738,9 @@ namespace COF
     // Patterns could be larger than specified Size,
     // so make sure that Pattern is handled even if the
     // specified Size is smaller than the size of the Pattern.
+    // TODO:
+    //  Remove this.
+    //  Its the users responsibility to make sure the size is valid.
     auto ParsedPattern = ParsePattern(IdaPattern);
     std::size_t PatternSize = ParsedPattern.size();
 
@@ -761,7 +770,7 @@ namespace COF
   }
 
   std::optional<DumpAnalyzer::Result<std::vector<DumpAnalyzer::MatchRange>>>
-    DumpAnalyzer::FindIdaPatternSubsequence(std::uint64_t StartOffset, std::size_t Size,
+    DumpAnalyzer::FindPatternSubsequence(std::uint64_t StartOffset, std::size_t Size,
       const std::vector<std::string>& IdaPatterns) const
   {
     Result<std::vector<MatchRange>> Out;
@@ -806,6 +815,226 @@ namespace COF
         Out.Value = MatchOffsets;
         return Out;
       }
+    }
+
+    return std::nullopt;
+  }
+
+  std::optional<DumpAnalyzer::Result<std::vector<DumpAnalyzer::MatchRange>>>
+    DumpAnalyzer::FindInstructionSequence(std::uint64_t StartOffset, std::size_t Size,
+      const std::vector<MatchInstruction>& Pattern) const
+  {
+    if (Pattern.empty())
+    {
+      // Pattern cant be empty
+      return std::nullopt;
+    }
+
+    // Read a chunk from the function start
+    auto Buffer = this->Read(StartOffset, Size);
+
+    if (Buffer.empty())
+    {
+      return std::nullopt;
+    }
+
+    Result<std::vector<MatchRange>> Out;
+    std::vector<MatchRange> MatchOffsets;
+    std::size_t PatternIndex = 0;
+    std::size_t Offset = 0;
+    ZydisDecoderContext Context;
+
+    // Helper to reset sequence state
+    auto ResetMatcher = [&]()
+    {
+      PatternIndex = 0;
+      MatchOffsets.clear();
+    };
+
+    while (Offset < Buffer.size())
+    {
+      ZydisDecodedInstruction Instruction;
+
+      if (!ZYAN_SUCCESS(ZydisDecoderDecodeInstruction(
+        &this->Decoder,
+        &Context,
+        Buffer.data() + Offset,
+        Buffer.size() - Offset,
+        &Instruction)))
+      {
+        // Decode failure, reset and advance by one byte
+        ++Offset;
+        ResetMatcher();
+        continue;
+      }
+
+      ZydisDecodedOperand Operands[ZYDIS_MAX_OPERAND_COUNT];
+
+      if (!ZYAN_SUCCESS(ZydisDecoderDecodeOperands(
+        &this->Decoder,
+        &Context,
+        &Instruction,
+        Operands,
+        Instruction.operand_count_visible)))
+      {
+        // Invalid operands, reset and skip instruction
+        Offset += Instruction.length;
+        ResetMatcher();
+        continue;
+      }
+
+      std::uint64_t InstructionOffset = StartOffset + Offset;
+      const MatchInstruction& MIInstruction = Pattern[PatternIndex];
+
+      // Mnemonic check (wildcard if nullopt)
+      if (MIInstruction.Mnemonic)
+      {
+        if (*MIInstruction.Mnemonic == ZYDIS_MNEMONIC_INVALID ||
+          *MIInstruction.Mnemonic != Instruction.mnemonic)
+        {
+          // Mismatch, reset and skip
+          Offset += Instruction.length;
+          ResetMatcher();
+          continue;
+        }
+      }
+
+      // Operand count check
+      if (Instruction.operand_count_visible != MIInstruction.Operands.size())
+      {
+        Offset += Instruction.length;
+        ResetMatcher();
+        continue;
+      }
+
+      // Per-operand checks
+      std::size_t OperandsMatched = 0;
+
+      for (std::size_t I = 0; I < Instruction.operand_count_visible; ++I)
+      {
+        const auto& Operand = Operands[I];
+        const auto& MIOperand = MIInstruction.Operands[I];
+
+        if (!MIOperand)
+        {
+          ++OperandsMatched;
+          continue;
+        }
+
+        if (Operand.type == ZYDIS_OPERAND_TYPE_REGISTER)
+        {
+          if (!MIOperand->Reg || MIOperand->Imm || MIOperand->Mem ||
+            Operand.reg.value != *MIOperand->Reg)
+          {
+            ResetMatcher();
+            break;
+          }
+
+          ++OperandsMatched;
+        }
+        else if (Operand.type == ZYDIS_OPERAND_TYPE_IMMEDIATE)
+        {
+          if (!MIOperand->Imm || MIOperand->Reg || MIOperand->Mem)
+          {
+            ResetMatcher();
+            break;
+          }
+          
+          bool ImmediateMatch = false;
+
+          if (Operand.imm.is_signed)
+          {
+            if (Operand.imm.size == sizeof(std::uint8_t) * CHAR_BIT) // 8-bits
+            {
+              ImmediateMatch = (static_cast<std::uint8_t>(Operand.imm.value.u) == *MIOperand->Imm);
+            }
+            else if (Operand.imm.size == sizeof(std::uint16_t) * CHAR_BIT) // 16-bits
+            {
+              ImmediateMatch = (static_cast<std::uint16_t>(Operand.imm.value.u) == *MIOperand->Imm);
+            }
+            else if (Operand.imm.size == sizeof(std::uint32_t) * CHAR_BIT) // 32-bits
+            {
+              ImmediateMatch = (static_cast<std::uint32_t>(Operand.imm.value.u) == *MIOperand->Imm);
+            }
+            else // 64-bits
+            {
+              ImmediateMatch = (static_cast<std::uint64_t>(Operand.imm.value.u) == *MIOperand->Imm);
+            }
+          }
+          else
+          {
+            ImmediateMatch = (Operand.imm.value.u == *MIOperand->Imm);
+          }
+
+          if (!ImmediateMatch)
+          {
+            ResetMatcher();
+            break;
+          }
+
+          ++OperandsMatched;
+        }
+        else if (Operand.type == ZYDIS_OPERAND_TYPE_MEMORY)
+        {
+          if (!MIOperand->Mem || MIOperand->Reg || MIOperand->Imm)
+          {
+            ResetMatcher();
+            break;
+          }
+
+          if (MIOperand->Mem->Base && Operand.mem.base != *MIOperand->Mem->Base)
+          {
+            ResetMatcher();
+            break;
+          }
+
+          if (MIOperand->Mem->Index && Operand.mem.index != *MIOperand->Mem->Index)
+          {
+            ResetMatcher();
+            break;
+          }
+
+          if (MIOperand->Mem->Scale && Operand.mem.scale != *MIOperand->Mem->Scale)
+          {
+            ResetMatcher();
+            break;
+          }
+
+          if (MIOperand->Mem->Disp && Operand.mem.disp.value != *MIOperand->Mem->Disp)
+          {
+            ResetMatcher();
+            break;
+          }
+
+          ++OperandsMatched;
+        }
+      }
+
+      // If any operand failed to match
+      if (OperandsMatched != Instruction.operand_count_visible)
+      {
+        Offset += Instruction.length;
+        ResetMatcher();
+        continue;
+      }
+
+      // Record the match and advance the sequence
+      MatchOffsets.push_back({ InstructionOffset, Instruction.length });
+      ++PatternIndex;
+
+      if (PatternIndex == 1)
+      {
+        Out.Range.Offset = InstructionOffset;
+      }
+
+      if (PatternIndex == Pattern.size())
+      {
+        Out.Range.Size = (InstructionOffset + Instruction.length) - Out.Range.Offset;
+        Out.Value = MatchOffsets;
+        return Out;
+      }
+
+      Offset += Instruction.length;
     }
 
     return std::nullopt;

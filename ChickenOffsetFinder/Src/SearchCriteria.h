@@ -55,6 +55,7 @@ namespace COF
       None,
       Pattern,
       PatternSubsequence,
+      InstructionSequence,
       InstructionSubsequence
     };
 
@@ -64,6 +65,7 @@ namespace COF
       String,
       Pattern,
       PatternSubsequence,
+      InstructionSequence,
       InstructionSubsequence
     };
 
@@ -113,6 +115,7 @@ namespace COF
     {
       { "Pattern", MatcherType::Pattern },
       { "PatternSubsequence", MatcherType::PatternSubsequence },
+      { "InstructionSequence", MatcherType::InstructionSequence },
       { "InstructionSubsequence", MatcherType::InstructionSubsequence }
     };
 
@@ -121,6 +124,7 @@ namespace COF
       { "String", AnchorType::String },
       { "Pattern", AnchorType::Pattern },
       { "PatternSubsequence", AnchorType::PatternSubsequence },
+      { "InstructionSequence", AnchorType::InstructionSequence },
       { "InstructionSubsequence", AnchorType::InstructionSubsequence }
     };
 

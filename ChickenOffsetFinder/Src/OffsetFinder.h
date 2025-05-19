@@ -68,6 +68,7 @@ namespace COF
     // Probably better to define getters instead to save a few bytes?
     std::string Pattern;
     std::vector<std::string> PatternSubsequence;
+    std::vector<std::string> InstructionSequence;
     std::vector<std::string> InstructionSubsequence;
 
     // This decides from which index in the subsequence list we match our target.
@@ -147,6 +148,7 @@ namespace COF
     std::string Pattern;
     std::vector<std::string> PatternSubsequence;
     std::vector<std::string> InstructionSubsequence;
+    std::vector<std::string> InstructionSequence;
 
     // There could be multiple anchor matches,
     // this chooses which match to use.
@@ -197,7 +199,7 @@ namespace COF
     std::vector<TSearchRegion>& GetSearchRegions();
 
     JSON& JSON_GetSearchRegions();
-    void JSON_UpdateSearchRange(const TRange& Range, TSearchRegion& Region, TSearchFor& ToFind);
+    void JSON_SyncSearchRange(const TRange& Range, TSearchRegion& Region, TSearchFor& ToFind);
 
     void AddFind(const TFound& FoundItem);
     std::optional<std::uint64_t> SetFunctionBase(TSearchRegion& Function);

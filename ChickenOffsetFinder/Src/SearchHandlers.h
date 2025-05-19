@@ -85,10 +85,40 @@ namespace COF
           else if (Matcher.Type == SearchCriteria::MatcherType::PatternSubsequence)
           {
             if (auto Found = Finder->GetAnalyzer()
-              .FindIdaPatternSubsequence(RegionRange.Offset + Range.Offset, Range.Size, Matcher.PatternSubsequence); Found)
+              .FindPatternSubsequence(RegionRange.Offset + Range.Offset, Range.Size, Matcher.PatternSubsequence); Found)
             {
               const auto& SubsequenceRange = (*Found->Value)[Matcher.Index];
               PostMatching(SubsequenceRange.Offset, SubsequenceRange.Size);
+            }
+          }
+          else if (Matcher.Type == SearchCriteria::MatcherType::InstructionSequence)
+          {
+            std::vector<AssemblyParser::ParsedInstruction> ParsedInstructions;
+
+            for (const auto& AsmText : Matcher.InstructionSequence)
+            {
+              auto Instruction = COF::AssemblyParser::ParseInstruction(AsmText);
+
+              if (!Instruction)
+              {
+                COF_LOG("[!] Parsing instruction (%s) in sequence failed!", AsmText.c_str());
+                return std::nullopt;
+              }
+
+              ParsedInstructions.push_back(*Instruction);
+            }
+
+            if (ParsedInstructions.empty())
+            {
+              COF_LOG("[!] No sequence instructions were parsed!");
+              return std::nullopt;
+            }
+
+            if (auto Found = Finder->GetAnalyzer()
+              .FindInstructionSequence(RegionRange.Offset + Range.Offset, Range.Size, ParsedInstructions); Found)
+            {
+              const auto& SequenceRange = (*Found->Value)[Matcher.Index];
+              PostMatching(SequenceRange.Offset, SequenceRange.Size);
             }
           }
           else if (Matcher.Type == SearchCriteria::MatcherType::InstructionSubsequence)

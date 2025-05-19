@@ -305,8 +305,11 @@ namespace COF
 
     template<StringType T = StringType::UTF16_LE>
     std::optional<Result<std::vector<std::uint64_t>>> FindString(const std::string& Str, std::size_t MaxMatches = 1) const;
+
     std::optional<Result<>> FindPattern(std::uint64_t StartOffset, std::size_t Size, const std::string& IdaPattern) const;
-    std::optional<Result<std::vector<MatchRange>>> FindIdaPatternSubsequence(std::uint64_t StartOffset, std::size_t Size, const std::vector<std::string>& IdaPatterns) const;
+    std::optional<Result<std::vector<MatchRange>>> FindPatternSubsequence(std::uint64_t StartOffset, std::size_t Size, const std::vector<std::string>& IdaPatterns) const;
+    
+    std::optional<Result<std::vector<MatchRange>>> FindInstructionSequence(std::uint64_t StartOffset, std::size_t Size, const std::vector<MatchInstruction>& Pattern) const;
     std::optional<Result<std::vector<MatchRange>>> FindInstructionSubsequence(std::uint64_t StartOffset, std::size_t Size, const std::vector<MatchInstruction>& Pattern) const;
 
     std::optional<Result<std::uint64_t>> ResolveRipRelativeOffset(std::uint64_t StartOffset, std::size_t Size,
