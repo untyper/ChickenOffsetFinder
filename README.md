@@ -1,4 +1,8 @@
 # ChickenOffsetFinder
+General purpose static offset finder for Windows programs (x64)
+
+Dumps a programs memory and scans through the dump to find the defined target offsets.
+This is an experimental project and is not intended for production use.
 
 ## Build
 - Launch `.sln` file and build (Visual Studio 2022)
@@ -38,145 +42,81 @@ Commands:
 ## Documentation
 ### Search Configuration
 
-This documentation describes the structure and usage of a JSON-based search configuration for analyzing binary files. Each section specifies regions, anchors, matchers, and search parameters used to identify and extract specific offsets or references from binary data.
-
----
-
-### Structure
-
-### Top-Level Array
-
 The configuration file consists of an array of objects, each defining a distinct search region within a binary.
 
----
+```js
+[
+  {
+    "RegionID": "Function_AllocateNameEntry", // Unique ID of region for internal implementation
 
-### Region Object
+    // "RegionType":
+    //   "Function"
+    //   "Section"
+    "RegionType": "Function",
 
-Each `Region` object describes a specific area or functionality within the binary to be analyzed.
+    // Defines the boundaries of the region. This is also used when locating the region with the anchor.
+    "RegionRange": {
+      "Size": 1628,  // Size of region
+      "SizeVariation": 64 // Possible size variation between old and new versions of the binary
+    },
 
-#### Fields:
+    // Determines how this region is accessed by the main finder loop.
+    // "AccessType":
+    //   "Normal" -> Default. The region is accessed by the main finder loop.
+    //   "XReference" -> the region is accessed by the XReference search handler.
 
-* **RegionID** *(string)*: A unique identifier for the region.
-* **RegionType** *(string)*: Type of the region (`Function`, `Section`).
-* **RegionRange** *(object|null)*: Specifies the size of the region and its allowable variation.
+    //  Consequently, if AccessType is "XReference", a search item must refer to this region by defining:
+    //   "SearchType": "XReference"
+    //   "NextRegion": {...}
 
-  * **Size** *(integer)*: Exact size in bytes.
-  * **SizeVariation** *(integer)*: Allowable variation in bytes.
-* **Anchors** *(array|null)*: Optional references or patterns that identify the region.
-* **SearchFor** *(array)*: Describes search actions within the region.
+    //  Read more about "NextRegion" below in the "SearchFor" array.
+    "AccessType": "Normal",
 
----
+    // List of search items to find offsets
+    "SearchFor": [
+      {
+        "SearchID": "GNames", // Unique ID of search item for internal implementation
 
-### Anchor Object
+        // Type of search, determines the value/offset extracted.
+        // "SearchType":
+        //   "Immediate"
+        //   "Displacement"
+        //   "Reference"
+        //   "XReference"
+        //   "TslDecryptor32"
+        //   "TslDecryptor64"
+        "SearchType": "Reference",
 
-Defines a reference point to precisely identify regions.
+        // Determines when an a value is considered a match.
+        // "MatcherMode":
+        //   "First" -> First matcher that matches the target constitutes a successful match
+        //   "All" -> All matchers defined in the "Matchers" array must match the target to constitute a successful match
+        "MatcherMode": "First",
 
-#### Fields:
-
-* **Type** *(string)*: Anchor type (`InstructionSequence`, `String`).
-* **Value** *(string|array)*: Specific pattern or string value.
-* **Index** *(integer, optional)*: Index of string anchor within the binary.
-
----
-
-### SearchFor Object
-
-Specifies what to search within a given region.
-
-#### Fields:
-
-* **SearchID** *(string)*: Unique identifier for this search.
-* **SearchType** *(string)*: Type of search (`Immediate`, `Reference`, `Displacement`, `TslDecryptor32`, `TslDecryptor64`, `XReference`).
-* **MatcherMode** *(string)*: Matching mode (`First`, etc.).
-* **Matchers** *(array|null)*: Array of pattern matchers.
-* **SearchRange** *(object)*: Specifies offset and size parameters.
-
-  * **Offset** *(integer)*: Start offset within region.
-  * **OffsetVariation** *(integer, optional)*: Allowable variation in offset.
-  * **Size** *(integer, optional)*: Search size.
-  * **SizeVariation** *(integer, optional)*: Allowable size variation.
-* **Print** *(object)*: Output formatting instructions.
-
-  * **Group** *(object)*: Categorization details.
-
-    * **ID** *(string)*: Group identifier.
-    * **Index** *(integer, optional)*: Sub-group index.
-  * **Name** *(string)*: Name of the found element.
-* **NextRegion** *(object, optional)*: Reference to the next search region by ID.
-
----
-
-### Matcher Object
-
-Specifies patterns to match within binary data.
-
-#### Fields:
-
-* **Type** *(string)*: Type of matcher (`Pattern`, `InstructionSequence`, `PatternSubsequence`).
-* **Value** *(string|array)*: Specific byte patterns or instruction sequences.
-* **Offset** *(integer, optional)*: Offset within the matched pattern.
-
----
-
-### Examples
-
-#### Example Region Definition:
-
-```json
-{
-  "RegionID": "Function_Rename",
-  "RegionType": "Function",
-  "RegionRange": {
-    "Size": 2742,
-    "SizeVariation": 64
-  },
-  "Anchors": [
-    {
-      "Type": "String",
-      "Value": "Cannot rename %s into Outer %s as it is not of type %s"
-    }
-  ],
-  "SearchFor": [
-    {
-      "SearchID": "ClassPrivate",
-      "SearchType": "Displacement",
-      "MatcherMode": "First",
-      "Matchers": [
-        {
-          "Type": "Pattern",
-          "Value": "48 8B 49 ?? 48 33 CA"
-        }
-      ],
-      "SearchRange": {
-        "Offset": 111,
-        "OffsetVariation": 32,
-        "Size": 4,
-        "SizeVariation": 32
-      },
-      "Print": {
-        "Group": {
-          "ID": "EngineOffsets.UObject"
+        // List of matchers to locate/find/match the target offset/value
+        "Matchers": [
+          {
+            "Type": "Pattern",
+            "Value": "4? 89 ?? ?? ?? ?? ??    4? 8D ?? ?? ?? ?? ??    E8 ?? ?? ?? ??    E9 ?? ?? ?? ??"
+          }
+        ],
+        "SearchRange": {
+          "Offset": 1331,
+          "OffsetVariation": 64,
+          "Size": 24,
+          "SizeVariation": 64
         },
-        "Name": "ClassPrivate"
+        "Print": {
+          "Group": {
+            "ID": "EngineRuntime"
+          },
+          "Name": "GNames"
+        }
       }
-    }
-  ]
-}
+    ]
+  }
+]
 ```
-
-#### Explanation:
-
-* **RegionID**: "Function\_Rename"
-* **Type**: Function region identified by the given string anchor.
-* **SearchFor**: Searches for displacement identified by a specific byte pattern.
-
----
-
-### Special Notes
-
-* Patterns support wildcards (`??`) to match varying bytes.
-This JSON structure provides powerful configuration flexibility for binary analysis tasks, enabling precise searches through complex binary data.
-
 
 ### Print Configuration:
 - TODO
