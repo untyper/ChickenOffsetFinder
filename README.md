@@ -60,6 +60,64 @@ The configuration file consists of an array of objects, each defining a distinct
       "SizeVariation": 64 // Possible size variation between old and new versions of the binary
     },
 
+    // Array of anchors. The offset finder iterates through each region
+    // and tries to locate the anchors defined here within each region's boundaries.
+    // The first region that contains ALL anchors within its boundaries (defined by RegionRange)
+    // is selected as the target region at which offsets will be attempted to be located by Matchers.
+    "Anchors": [
+      // "Type":
+      //   "String"
+      //     - Locate by string
+      //   "Pattern"
+      //     - Locate by a string pattern (e.g. "D? AD ?? EE ??"), nibble wild cards are allowed.
+      //   "PatternSubsequence"
+      //     - Locate by an array of string patterns. Gaps can exist between each string pattern in the array.
+      //   "InstructionSequence"
+      //     - Locate by an array of basic ASM isntructions (e.g. "mov ?, [rip+?]").
+      //       No gaps between each instruction.
+      //   "InstructionSubsequence"
+      //     - Locate by an array of basic ASM isntructions.
+      //       Gaps can exist between each instruction in the array.
+
+      // Note:
+      //   The ASM instruction parser is very basic and only supports very basic instruction formats.
+      //   The ASM instruction mnemonics should be defined inline with Zydis 4.x mappings.
+
+      // Examples:
+      {
+        "Type": "String",
+        "Value": "&APlantedTimeBombActor::OnBombIsDismantled"
+      },
+      {
+        "Type": "Pattern",
+        "Value": "D? AD ?? EE ??"
+      },
+      {
+        "Type": "PatternSubsequence",
+        "Value": [
+          "D? AD ?? EE ??",
+          "4? AE ?? EA ??",
+          "48 AF 80 EB ??"
+        ]
+      },
+      {
+        "Type": "InstructionSequence",
+        "Value": [
+          "mov ?, ?",
+          "lea ?, ?",
+          "mov ?, [rip+?]"
+        ]
+      },
+      {
+        "Type": "InstructionSubsequence",
+        "Value": [
+          "call ?",
+          "mov ?, 0x28",
+          "jmp ?"
+        ]
+      }
+    ],
+
     // Determines how this region is accessed by the main finder loop.
     // "AccessType":
     //   "Normal" -> Default. The region is accessed by the main finder loop.
