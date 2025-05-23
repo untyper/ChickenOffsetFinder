@@ -79,7 +79,7 @@ The configuration file consists of an array of objects, each defining a distinct
       //     - Locate by an array of basic ASM isntructions.
       //       Gaps can exist between each instruction in the array.
 
-      // Note:
+      // Notes:
       //   The ASM instruction parser is very basic and only supports very basic instruction formats.
       //   The ASM instruction mnemonics should be defined inline with Zydis 4.x mappings.
 
@@ -118,25 +118,25 @@ The configuration file consists of an array of objects, each defining a distinct
       }
     ],
 
-    // Determines how this region is accessed by the main finder loop.
-    // "AccessType":
-    //   "Normal" -> Default. The region is accessed by the main finder loop.
-    //   "XReference" -> the region is accessed by the XReference search handler.
+    // "AccessType" (Determines how this region is accessed by the main finder loop):
+    //   "Normal"
+    //     - Default. The region is accessed by the main finder loop.
+    //   "XReference"
+    //     - The region is accessed by the XReference search handler.
 
     //  Consequently, if AccessType is "XReference", a search item must refer to this region by defining:
-    //   "SearchType": "XReference"
-    //   "NextRegion": {...}
+    //    "SearchType": "XReference"
+    //    "NextRegion": {...}
 
     //  Read more about "NextRegion" below in the "SearchFor" array.
     "AccessType": "Normal",
 
-    // List of search items to find offsets
+    // List of search items. These define the type of offset/value to find and how to find them.
     "SearchFor": [
       {
         "SearchID": "GNames", // Unique ID of search item for internal implementation
 
-        // Type of search, determines the value/offset extracted.
-        // "SearchType":
+        // "SearchType" (Type of search, determines the value/offset extracted):
         //   "Immediate"
         //   "Displacement"
         //   "Reference"
@@ -145,25 +145,70 @@ The configuration file consists of an array of objects, each defining a distinct
         //   "TslDecryptor64"
         "SearchType": "Reference",
 
-        // Determines when an a value is considered a match.
-        // "MatcherMode":
-        //   "First" -> First matcher that matches the target constitutes a successful match
-        //   "All" -> All matchers defined in the "Matchers" array must match the target to constitute a successful match
+        // "MatcherMode" (Determines when a value is considered to be a match):
+        //   "First"
+        //     - First matcher that matches the target constitutes a successful match
+        //   "All"
+        //     - All matchers defined in the "Matchers" array must match the target to constitute a successful match
         "MatcherMode": "First",
 
-        // List of matchers to locate/find/match the target offset/value
+        // List of matchers to locate the target offset/value within the region boundaries (defined by RegionRange) 
         "Matchers": [
+          // "Type":
+          //   "Pattern"
+          //     - Locate by a string pattern (e.g. "D? AD ?? EE ??"), nibble wild cards are allowed.
+          //   "PatternSubsequence"
+          //     - Locate by an array of string patterns. Gaps can exist between each string pattern in the array.
+          //   "InstructionSequence"
+          //     - Locate by an array of basic ASM isntructions (e.g. "mov ?, [rip+?]").
+          //       No gaps between each instruction.
+          //   "InstructionSubsequence"
+          //     - Locate by an array of basic ASM isntructions.
+          //       Gaps can exist between each instruction in the array.
+
+          // Notes:
+          //   The ASM instruction parser is very basic and only supports very basic instruction formats.
+          //   The ASM instruction mnemonics should be defined inline with Zydis 4.x mappings.
+          //   Unlike Anchors, the matcher Type cannot be a String.
+
+          // Examples:
           {
             "Type": "Pattern",
-            "Value": "4? 89 ?? ?? ?? ?? ??    4? 8D ?? ?? ?? ?? ??    E8 ?? ?? ?? ??    E9 ?? ?? ?? ??"
+            "Value": "D? AD ?? EE ??"
+          },
+          {
+            "Type": "PatternSubsequence",
+            "Value": [
+              "D? AD ?? EE ??",
+              "4? AE ?? EA ??",
+              "48 AF 80 EB ??"
+            ]
+          },
+          {
+            "Type": "InstructionSequence",
+            "Value": [
+              "mov ?, ?",
+              "lea ?, ?",
+              "mov ?, [rip+?]"
+            ]
+          },
+          {
+            "Type": "InstructionSubsequence",
+            "Value": [
+              "call ?",
+              "mov ?, 0x28",
+              "jmp ?"
+            ]
           }
         ],
+
         "SearchRange": {
           "Offset": 1331,
           "OffsetVariation": 64,
           "Size": 24,
           "SizeVariation": 64
         },
+
         "Print": {
           "Group": {
             "ID": "EngineRuntime"
