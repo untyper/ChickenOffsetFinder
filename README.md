@@ -268,8 +268,6 @@ This is the main configuration file that defines how and where target offsets/va
 The print configuration file defines the layout of the final output (offsets) file.
 It is for the most part self explanatory.
 
-TODO: Document `Frame.Style` and `Frame.AlignContent`
-
 ```js
 {
   "Head": {
