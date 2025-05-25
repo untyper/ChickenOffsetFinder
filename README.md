@@ -5,7 +5,10 @@ Dumps a programs memory and scans through the dump to find the defined target of
 This is an experimental project and is not intended for production use.
 
 ## Build
-- Launch `.sln` file and build (Visual Studio 2022)
+1. This project uses the hypervisor for memory reading operations, so make sure Intel Virtualization is enabled.
+2. Build and run the `hv` driver. See the Dependencies section.
+3. (Optional) This project already contains pre-built Zydis binaries however you can also build your own.
+4. Launch `.sln` file and build (Visual Studio 2022)
 
 ## Usage
 ```
@@ -44,11 +47,11 @@ Commands:
 
 This is the main configuration file that defines how and where target offsets/values are found.
 
-
 ```js
 [
   {
-    "RegionID": "Function_AllocateNameEntry", // Unique ID of region for internal implementation
+    // Unique ID of region for internal implementation
+    "RegionID": "Function_AllocateNameEntry",
 
     // "RegionType":
     //   "Function"
@@ -57,7 +60,7 @@ This is the main configuration file that defines how and where target offsets/va
 
     // Defines the boundaries of the region. This is also used when locating the region with the anchor.
     "RegionRange": {
-      "Size": 1628,  // Size of region
+      "Size": 1628,       // Size of region
       "SizeVariation": 64 // Possible size variation between old and new versions of the binary
     },
 
@@ -68,17 +71,17 @@ This is the main configuration file that defines how and where target offsets/va
     "Anchors": [
       // "Type":
       //   "String"
-      //      Locate by string
+      //       Locate by string
       //   "Pattern"
-      //      Locate by a string pattern (e.g. "D? AD ?? EE ??"), nibble wild cards are allowed.
+      //       Locate by a string pattern (e.g. "D? AD ?? EE ??"), nibble wild cards are allowed.
       //   "PatternSubsequence"
-      //      Locate by an array of string patterns. Gaps can exist between each string pattern in the array.
+      //       Locate by an array of string patterns. Gaps can exist between each string pattern in the array.
       //   "InstructionSequence"
-      //      Locate by an array of basic ASM isntructions (e.g. "mov ?, [rip+?]").
-      //      No gaps between each instruction.
+      //       Locate by an array of basic ASM isntructions (e.g. "mov ?, [rip+?]").
+      //       No gaps between each instruction.
       //   "InstructionSubsequence"
-      //      Locate by an array of basic ASM isntructions.
-      //      Gaps can exist between each instruction in the array.
+      //       Locate by an array of basic ASM isntructions.
+      //       Gaps can exist between each instruction in the array.
 
       // Notes:
       //   The ASM instruction parser is very basic and only supports very basic instruction formats.
@@ -121,9 +124,9 @@ This is the main configuration file that defines how and where target offsets/va
 
     // "AccessType" (Determines how this region is accessed by the main finder loop):
     //   "Normal"
-    //      Default. The region is accessed by the main finder loop.
+    //       Default. The region is accessed by the main finder loop.
     //   "XReference"
-    //      The region is accessed by the XReference search handler.
+    //       The region is accessed by the XReference search handler.
 
     //  Consequently, if AccessType is "XReference", a search item must refer to this region by defining:
     //    "SearchType": "XReference"
@@ -148,24 +151,24 @@ This is the main configuration file that defines how and where target offsets/va
 
         // "MatcherMode" (Determines when a value is considered to be a match):
         //   "First"
-        //      First matcher that matches the target constitutes a successful match
+        //       First matcher that matches the target constitutes a successful match
         //   "All"
-        //      All matchers defined in the "Matchers" array must match the target to constitute a successful match
+        //       All matchers defined in the "Matchers" array must match the target to constitute a successful match
         "MatcherMode": "First",
 
         // List of matchers to locate the target offset/value within the region boundaries (defined by RegionRange) 
         "Matchers": [
           // "Type":
           //   "Pattern"
-          //      Locate by a string pattern (e.g. "D? AD ?? EE ??"), nibble wild cards are allowed.
+          //       Locate by a string pattern (e.g. "D? AD ?? EE ??"), nibble wild cards are allowed.
           //   "PatternSubsequence"
-          //      Locate by an array of string patterns. Gaps can exist between each string pattern in the array.
+          //       Locate by an array of string patterns. Gaps can exist between each string pattern in the array.
           //   "InstructionSequence"
-          //      Locate by an array of basic ASM isntructions (e.g. "mov ?, [rip+?]").
-          //      No gaps between each instruction.
-          //   "InstructionSubsequence"
-          //      Locate by an array of basic ASM isntructions.
-          //      Gaps can exist between each instruction in the array.
+          //       Locate by an array of basic ASM isntructions (e.g. "mov ?, [rip+?]").
+          //       No gaps between each instruction.
+          //  "InstructionSubsequence"
+          //       Locate by an array of basic ASM isntructions.
+          //       Gaps can exist between each instruction in the array.
 
           // Notes:
           //   The ASM instruction parser is very basic and only supports very basic instruction formats.
@@ -261,10 +264,106 @@ This is the main configuration file that defines how and where target offsets/va
 ```
 
 ### Print Configuration:
-- TODO
+
+The print configuration file defines the layout of the final output (offsets) file.
+It is for the most part self explanatory.
+
+TODO: Document `Frame.Style` and `Frame.AlignContent`
+
+```js
+{
+  "Head": {
+    "ShowGeneratedByMessage": true,
+    "UserNote": "Offsets are untested. Use at your own discretion.",
+    
+    "ShowProfile": true,
+    "ShowBinaryVersion": true,
+    "ShowDateGenerated": true
+  },
+  
+  "Gap": 1, // Gap between Head and Body
+  
+  "Body": {
+    "Gap": 1,  // Gap between each section
+
+    "Sections": [
+      {      
+        "Header": {
+          "Title": "EngineRuntime1",
+          "Frame": {
+            // "Style":
+            //   "Borderless"
+            //   "BorderBox"
+            //   "BorderUp"
+            //   "BorderDown"
+            "Style": "BorderBox",
+
+            // "AlignContent":
+            //   "Left"
+            //   "Center"
+            //   "Right"
+            "AlignContent": "Left",
+
+            "BackgroundChar": null,
+            "BorderChar": "-",
+            "BorderWidth": 80,
+            "Padding": 0
+          }
+        },
+        
+        "Gap": 1, // Gap between Header and Code
+        
+        "Code": [
+          "$VAR(EngineRuntime,std::uint64_t,0x%llX)"
+        ]
+      },
+      {      
+        "Header": {
+          "Title": "EngineRuntime2",
+          "Frame": {
+            "Style": "BorderBox",
+            "AlignContent": "Left",
+            "BackgroundChar": null,
+            "BorderChar": "+",
+            "BorderWidth": 80,
+            "Padding": 0
+          }
+        },
+        
+        "Gap": 1, // Gap between Header and Code
+        
+        "Code": [
+          "$STR(EngineRuntime,%s\n)"
+        ]
+      }
+    ]
+  }
+}
+```
 
 ### Profiles Configuration:
-- TODO
+
+The profiles configuration file exists simply to semantically bind the search and print configuration files under an appropriate name.
+This makes using the tool just slighly more convenient. See the Usage section above to know how to make use of this.
+
+```js
+{
+  "UnrealEngineGame": {
+    "SearchConfig": "Search.cof.json",
+    "PrintConfig": "Print.cof.json"
+  }
+}
+```
+
+### Notes About Configuration Files:
+
+This project uses `nlohmann/json` for configuration files. The project has explicitly configured it to ignore comments in the `.json` files.
+
+## Dependencies
+- https://github.com/nlohmann/json
+- https://github.com/jonomango/hv
+- https://github.com/zyantific/zydis (4.x)
+- https://github.com/untyper/process-memory-module
 
 ## License
 - MIT
