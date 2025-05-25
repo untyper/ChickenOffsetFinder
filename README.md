@@ -42,7 +42,8 @@ Commands:
 ## Documentation
 ### Search Configuration
 
-The configuration file consists of an array of objects, each defining a distinct search region within a binary.
+This is the main configuration file that defines how and where target offsets/values are found.
+
 
 ```js
 [
@@ -67,17 +68,17 @@ The configuration file consists of an array of objects, each defining a distinct
     "Anchors": [
       // "Type":
       //   "String"
-      //     - Locate by string
+      //      Locate by string
       //   "Pattern"
-      //     - Locate by a string pattern (e.g. "D? AD ?? EE ??"), nibble wild cards are allowed.
+      //      Locate by a string pattern (e.g. "D? AD ?? EE ??"), nibble wild cards are allowed.
       //   "PatternSubsequence"
-      //     - Locate by an array of string patterns. Gaps can exist between each string pattern in the array.
+      //      Locate by an array of string patterns. Gaps can exist between each string pattern in the array.
       //   "InstructionSequence"
-      //     - Locate by an array of basic ASM isntructions (e.g. "mov ?, [rip+?]").
-      //       No gaps between each instruction.
+      //      Locate by an array of basic ASM isntructions (e.g. "mov ?, [rip+?]").
+      //      No gaps between each instruction.
       //   "InstructionSubsequence"
-      //     - Locate by an array of basic ASM isntructions.
-      //       Gaps can exist between each instruction in the array.
+      //      Locate by an array of basic ASM isntructions.
+      //      Gaps can exist between each instruction in the array.
 
       // Notes:
       //   The ASM instruction parser is very basic and only supports very basic instruction formats.
@@ -120,9 +121,9 @@ The configuration file consists of an array of objects, each defining a distinct
 
     // "AccessType" (Determines how this region is accessed by the main finder loop):
     //   "Normal"
-    //     - Default. The region is accessed by the main finder loop.
+    //      Default. The region is accessed by the main finder loop.
     //   "XReference"
-    //     - The region is accessed by the XReference search handler.
+    //      The region is accessed by the XReference search handler.
 
     //  Consequently, if AccessType is "XReference", a search item must refer to this region by defining:
     //    "SearchType": "XReference"
@@ -147,24 +148,24 @@ The configuration file consists of an array of objects, each defining a distinct
 
         // "MatcherMode" (Determines when a value is considered to be a match):
         //   "First"
-        //     - First matcher that matches the target constitutes a successful match
+        //      First matcher that matches the target constitutes a successful match
         //   "All"
-        //     - All matchers defined in the "Matchers" array must match the target to constitute a successful match
+        //      All matchers defined in the "Matchers" array must match the target to constitute a successful match
         "MatcherMode": "First",
 
         // List of matchers to locate the target offset/value within the region boundaries (defined by RegionRange) 
         "Matchers": [
           // "Type":
           //   "Pattern"
-          //     - Locate by a string pattern (e.g. "D? AD ?? EE ??"), nibble wild cards are allowed.
+          //      Locate by a string pattern (e.g. "D? AD ?? EE ??"), nibble wild cards are allowed.
           //   "PatternSubsequence"
-          //     - Locate by an array of string patterns. Gaps can exist between each string pattern in the array.
+          //      Locate by an array of string patterns. Gaps can exist between each string pattern in the array.
           //   "InstructionSequence"
-          //     - Locate by an array of basic ASM isntructions (e.g. "mov ?, [rip+?]").
-          //       No gaps between each instruction.
+          //      Locate by an array of basic ASM isntructions (e.g. "mov ?, [rip+?]").
+          //      No gaps between each instruction.
           //   "InstructionSubsequence"
-          //     - Locate by an array of basic ASM isntructions.
-          //       Gaps can exist between each instruction in the array.
+          //      Locate by an array of basic ASM isntructions.
+          //      Gaps can exist between each instruction in the array.
 
           // Notes:
           //   The ASM instruction parser is very basic and only supports very basic instruction formats.
@@ -202,17 +203,55 @@ The configuration file consists of an array of objects, each defining a distinct
           }
         ],
 
+        // Search range within the region boundaries (defined by RegionRange)
+        //  in which matchers are used to locate and extract the target value/offset.
         "SearchRange": {
+          // Offset from base of region. If -sync flag is used, this will be updated to
+          //  the offset at which our target value/offset was found.
           "Offset": 1331,
-          "OffsetVariation": 64,
+
+          // Size of search region (in bytes). This should be large enough to accomodate
+          //  the size of the largest matcher in the Matchers array.
           "Size": 24,
+
+          // Possible variation between binary updates
+          "OffsetVariation": 64,
           "SizeVariation": 64
         },
 
+        // If SearchType is XReference this refers to the next region (search items) to handle.
+        // When an XReference offset has been found by the main finder loop,
+        // it will be set as the base of the next region (XReferenced region).
+        "NextRegion": {
+          // ID of the next region to handle.
+          // A region with this ID must already be defined, and it's AccessType must be XReference.
+          "ID": "Function_AllocateNameEntry"
+        },
+
+        // "Print"
+        //   Defines basic information on how to print the found offsets into a file.
+        //   This information is required by the print configuration file.
+
+        // Notes:
+        //  "Print" should not be defined when SearchType is XReference,
+        //  since XReferences in this file merely refer to a another region (also) defined in this file.
+
         "Print": {
           "Group": {
-            "ID": "EngineRuntime"
+            // Group ID which is matched by it's equivalent within $STR / $VAR calls in the print configuration file.
+            // This is crucial for printing the found offsets into the desired layout defined by the print configuration file.
+            "ID": "EngineRuntime",
+
+            // When there are multiple printables of the same group (ID), Index serves as the order of appearance
+            //  within the print configurations code functions ($STR, $VAR).
+
+            // The Index property is prioritized.
+            // Any group members that don't define an Index are printed according to order of appearance in this file.
+            "Index": 0
           },
+
+          // The name/identifier of the variable/string printed to the final output file
+          //  (e.g. uint64_t GNames = <FOUND_OFFSET>). This is currently only useful for $VAR.
           "Name": "GNames"
         }
       }
